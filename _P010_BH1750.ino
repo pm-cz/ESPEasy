@@ -7,10 +7,9 @@
 #define PLUGIN_NAME_010       "Luminosity - BH1750"
 #define PLUGIN_VALUENAME1_010 "Lux"
 
-#define BH1750_ADDRESS_1    0x23
-#define BH1750_ADDRESS_2    0x5c
-boolean Plugin_010_init_1 = false;
-boolean Plugin_010_init_2 = false;
+#define BH1750_ADDRESS_0    0x23
+#define BH1750_ADDRESS_1    0x5c
+boolean Plugin_010_init[2] = {false, false};
 
 boolean Plugin_010(byte function, struct EventStruct *event, String& string)
   {
@@ -84,23 +83,14 @@ boolean Plugin_010(byte function, struct EventStruct *event, String& string)
 
   case PLUGIN_READ:
     {
-      uint8_t address = -1;
-      boolean *Plugin_010_init;
+      uint8_t address;
 
-      if(Settings.TaskDevicePluginConfig[event->TaskIndex][0]==0)
-        {
-            address = BH1750_ADDRESS_1;
-            Plugin_010_init = &Plugin_010_init_1;
-        }
-      else
-        {
-            address = BH1750_ADDRESS_2;
-            Plugin_010_init = &Plugin_010_init_2;
-        }
+      uint8_t index = (Settings.TaskDevicePluginConfig[event->TaskIndex][0]) & 1; // & 1 Just to make sure that somebody does not store different value there
+      address = (index==0)?BH1750_ADDRESS_0:BH1750_ADDRESS_1;
 
-      if (!*Plugin_010_init)
+      if (!Plugin_010_init[index])
         {
-          *Plugin_010_init = Plugin_010_setResolution(address);
+          Plugin_010_init[index] = Plugin_010_setResolution(address);
         }
 
       if (Wire.requestFrom(address, (uint8_t)2) == 2)
@@ -108,7 +98,8 @@ boolean Plugin_010(byte function, struct EventStruct *event, String& string)
           byte b1 = Wire.read();
           byte b2 = Wire.read();
           float val = 0xffff; //pm-cz: Maximum obtainable value
-          if (b1 != 0xff || b2 != 0xff) { //pm-cz: Add maximum range check
+          if (b1 != 0xff || b2 != 0xff) //pm-cz: Add maximum range check
+          {
             val=((b1<<8)|b2)/1.2;
           }
           UserVar[event->BaseVarIndex] = val;
@@ -129,5 +120,6 @@ boolean Plugin_010_setResolution(uint8_t address){
           Wire.beginTransmission(address);
           Wire.write(0x10);                             // 1 lx resolution
           Wire.endTransmission();
+          //delay(150); // Wait 150 ms before first measurement to collect data (130 should be enough)
           return true;
 }
